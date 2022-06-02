@@ -11,7 +11,7 @@ Two loss functions were explored, a Tversky Dice weighted cross entropy and a we
 ## Results
 ### Tversky Dice Weighted Cross Entropy
 Training Metrics:
-![](./misc/TverskyDice/accuracy-loss.png)
+![](./misc/TverskyDice/accuracy_loss.png)
 Original Images:
 ![](./misc/TverskyDice/test-set.png)
 Original Masks:
