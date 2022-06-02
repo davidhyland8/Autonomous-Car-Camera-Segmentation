@@ -1,7 +1,10 @@
 import numpy as np
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from random import sample
 
+from torch import tensor
+from torch.nn import CrossEntropyLoss
 from SegmentationDataset import SegmentationDataset
 from SegmentationUNet import SegmentationUNet
 from TverskyCrossEntropyDiceWeightedLoss import \
@@ -14,19 +17,33 @@ def load_data(path):
     :param path: Path to location of dataset
     :return: lists of all the images and masks
     """
-    images_list = list(path.glob('*/*/CameraRGB/*.png'))
-    masks_list = list(path.glob('*/*/CameraSeg/*.png'))
-    if len(images_list) != len(masks_list):
-        raise ValueError('Invalid data loaded')
-    images_list = np.array(images_list)
-    masks_list = np.array(masks_list)
-    return images_list, masks_list
+    dirs = ['Clear Noon Dry', 'Cloudy Evening HR', 'Cloudy Evening LR', 'Night Dry', 'Night HR', 'Night LR']
+    all_images = []
+    all_masks = []
+
+    for d in dirs:
+        images_list = list(path.glob(f'{d}/RGB/*.npy'))
+        images_list.sort()
+        masks_list = list(path.glob(f'{d}/Semantic/*.npy'))
+        masks_list.sort()
+        if len(images_list) != len(masks_list):
+            raise ValueError('Invalid data loaded')
+        pairs = zip(images_list, masks_list)
+        pairs = sample(list(pairs), 2000)
+        images_list, masks_list = zip(*pairs)
+        all_images += images_list
+        all_masks += masks_list
+    
+    all_images = np.array(all_images)
+    all_masks = np.array(all_masks)
+    
+    return all_images, all_masks
 
 
 class SegmentationAgent:
     def __init__(self, val_percentage, test_num, num_classes,
                  batch_size, img_size, data_path, shuffle_data,
-                 learning_rate, device):
+                 learning_rate, device, tv=True):
         """
         A helper class to facilitate the training of the model
         """
@@ -41,8 +58,12 @@ class SegmentationAgent:
         self.validation_loader = self.get_dataloader(val_split)
         self.test_loader = self.get_dataloader(test_split)
         self.model = SegmentationUNet(self.num_classes, self.device)
-        self.criterion = TverskyCrossEntropyDiceWeightedLoss(self.num_classes,
+        self.weight = tensor([0.0833, 0.0762, 0.0833, 0.0665, 0.0833, 0.0820, 0.0816, 0.0332, 0.0819, 0.0817, 0.0833, 0.0803, 0.0833]).float().to(self.device)
+        if tv:
+            self.criterion = TverskyCrossEntropyDiceWeightedLoss(self.num_classes,
                                                              self.device)
+        else:
+            self.criterion = CrossEntropyLoss(self.weight)
         self.optimizer = Adam(self.model.parameters(), lr=learning_rate)
         self.model.to(self.device)
 
@@ -59,6 +80,8 @@ class SegmentationAgent:
             shuffle_idx = np.random.permutation(range(len(self.images_list)))
             self.images_list = self.images_list[shuffle_idx]
             self.masks_list = self.masks_list[shuffle_idx]
+            # np.random.shuffle(self.images_list)
+            # np.random.shuffle(self.masks_list)
 
         val_num = len(self.images_list) - int(
             val_percentage * len(self.images_list))

@@ -1,7 +1,7 @@
 from torch import cat
 from torch.nn import BatchNorm2d, Conv2d, ConvTranspose2d, MaxPool2d, Module, \
     ModuleList, Sequential
-from torch.nn.functional import relu
+from torch.nn.functional import relu, conv2d
 
 
 def conv(in_channels, out_channels, kernel_size=3, padding=1, batch_norm=True):
@@ -113,7 +113,34 @@ class SegmentationUNet(Module):
             outs = ins // 2
             up_conv = UpConv(ins, outs)
             self.up_convs.append(up_conv)
+        '''
+        for i in range(depth):
+            if i == 4:
+                down_conv = DownConv(outs, 64, pooling=pooling)
+                self.down_convs.append(down_conv)
+            else:
+                ins = self.in_channels if i == 0 else outs
+                outs = self.start_filts * (2 ** i)
+                pooling = True if i < depth - 1 else False
 
+                down_conv = DownConv(ins, outs, pooling=pooling)
+                self.down_convs.append(down_conv)
+        
+        down_conv = DownConv(outs, 64, pooling=pooling)
+        self.down_convs.append(down_conv)
+        
+        up_conv = UpConv(64, outs)
+        self.up_convs.append(up_conv)
+        
+        for i in range(depth - 1):
+            if i == 0:
+                up_conv = UpConv(64, outs)
+                self.up_convs.append(up_conv)
+            ins = outs
+            outs = ins // 2
+            up_conv = UpConv(ins, outs)
+            self.up_convs.append(up_conv)
+        '''
         self.conv_final = conv(outs, self.num_classes, kernel_size=1, padding=0,
                                batch_norm=False)
 
